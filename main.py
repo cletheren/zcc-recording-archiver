@@ -20,6 +20,10 @@ ZOOM_CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
 # Set the path where you would like to store the recordings
 RECORDING_PATH = "/Users/craigletheren/Desktop/Recordings"
 
+# Set the timeframe for the download
+START_DATE = "2023-10-01T00:00:00"
+END_DATE = "2023-10-31T23:59:59"
+
 class Client:
     """Connect to Zoom via OAuth and manage the bearer token"""
 
@@ -106,8 +110,8 @@ def get_recording_list(client: Client) -> list[Recording]:
         "Authorization": f"Bearer {client.token}",
     }
     params = {
-        "from": "2023-10-01T00:00:00",
-        "to": "2023-10-31T23:59:59",
+        "from": START_DATE,
+        "to": END_DATE,
         "channel_type": "voice",
         "next_page_token": ""
     }
