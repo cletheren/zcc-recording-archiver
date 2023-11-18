@@ -13,9 +13,9 @@ logging.basicConfig(format="%(levelname)s:%(asctime)s %(message)s", level=loggin
 
 # Load the required environment variables from .env
 load_dotenv()
-ZOOM_ACCOUNT_ID = os.environ.get("ACCOUNT_ID")
-ZOOM_CLIENT_ID = os.environ.get("CLIENT_ID")
-ZOOM_CLIENT_SECRET = os.environ.get("CLIENT_SECRET")
+ZOOM_ACCOUNT_ID = os.environ.get("ZOOM_ACCOUNT_ID")
+ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID")
+ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET")
 
 # Set the path where you would like to store the recordings
 RECORDING_PATH = "/Users/craigletheren/Desktop/Recordings"
@@ -32,12 +32,12 @@ class Client:
     def __init__(self, client_id: str, client_secret: str, account_id: str) -> None:
         self.account_id = account_id
         self.client_id = client_id
-        self.b64 = base64.b64encode(f"{self.client_id}:{client_secret}".encode())
+        self.b64 = base64.b64encode(f"{self.client_id}:{client_secret}".encode()).decode()
 
     def get_token(self) -> str:
         url = "https://zoom.us/oauth/token"
         headers = {
-            "Authorization": f"Basic {self.b64.decode()}",
+            "Authorization": f"Basic {self.b64}",
         }
         params = {
             "account_id": self.account_id,
@@ -51,6 +51,7 @@ class Client:
             self.expiry_time = datetime.now().timestamp() + response_body["expires_in"]
         except requests.HTTPError as err:
             print(err)
+            quit()
         return r.json()["access_token"]
     
     @property
