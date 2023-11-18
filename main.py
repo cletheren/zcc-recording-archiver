@@ -142,7 +142,7 @@ def get_recording_list(client: Client) -> list[Recording]:
 
 def main():
     errors = []
-    client = Client(CLIENT_ID, CLIENT_SECRET, ACCOUNT_ID)
+    client = Client(ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, ZOOM_ACCOUNT_ID)
     client.get_token()
     recording_list = get_recording_list(client)
 
