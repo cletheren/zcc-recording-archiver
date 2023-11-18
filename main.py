@@ -2,14 +2,14 @@ import base64
 from datetime import datetime
 import logging
 import os
-from pathlib import PurePath
+from pathlib import Path
+from sys import exit
 
 from dotenv import load_dotenv
 import requests
-from tqdm.auto import tqdm
 
 # Configure logging
-logging.basicConfig(format="%(levelname)s:%(asctime)s %(message)s", level=logging.WARNING)
+logging.basicConfig(format="%(levelname)s:%(asctime)s %(message)s", datefmt="%d/%m/%Y %H:%M:%S", level=logging.INFO)
 
 # Load the required environment variables from .env
 load_dotenv()
@@ -18,7 +18,7 @@ ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID")
 ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET")
 
 # Set the path where you would like to store the recordings
-RECORDING_PATH = "/Users/craigletheren/Desktop/Recordings"
+RECORDING_PATH = Path("/Users/cletheren/Recordings")
 
 # Set the timeframe for the download
 START_DATE = "2023-10-01T00:00:00"
@@ -44,14 +44,16 @@ class Client:
             "grant_type": "account_credentials"
         }
         try:
+            logging.debug("Generating a new bearer token...")
             r = requests.post(url, headers=headers, params=params)
             r.raise_for_status()
             response_body = r.json()
             self.token = response_body["access_token"]
             self.expiry_time = datetime.now().timestamp() + response_body["expires_in"]
+            logging.debug(f"New token generated, expires at {self.expiry_time}")
         except requests.HTTPError as err:
             print(err)
-            quit()
+            exit(1)
         return r.json()["access_token"]
     
     @property
@@ -60,7 +62,7 @@ class Client:
         return now > self.expiry_time
     
 class Recording:
-    """Represent a recording object"""
+    """Object to represent a recorded asset"""
 
     def __init__(
             self,
@@ -76,35 +78,42 @@ class Recording:
         self.recording_id = recording_id
         self.download_url = download_url
 
-    def download(self, client: Client) -> list[str]:
-        errors = []
+    def download(self, client: Client, path: Path) -> None:
         headers = {
             "Authorization": f"Bearer {client.token}"
         }
-        extension = "mp3" if self.channel_type == "voice" else "mp4"
         start_time = datetime.fromisoformat(self.start_time).strftime("%y%d%m_%H%M%S")
+        try:
+            if not path.exists():
+                path.mkdir(parents=True)
+        except PermissionError as err:
+            logging.info(f"{err}, please check your RECORDING_PATH and try again")
+            quit()
+        extension = "mp3" if self.channel_type == "voice" else "mp4"
         filename = f"{start_time}_{self.engagement_id}_{self.recording_id}.{extension}"
-        path = PurePath(RECORDING_PATH, filename)
+        filename = Path(path, filename)
         with requests.Session() as req:
             if client.token_has_expired:
+                    logging.debug("Bearer token has expired, generating a new one...")
                     client.get_token()
                     headers["Authorization"] = f"Bearer {client.token}"
             try:
                 r = req.get(self.download_url, headers=headers, stream=True)
-                logging.debug(f"{self.download_url}")
+                logging.debug(f"Downloading {self.download_url}")
                 r.raise_for_status()
-                with open(path, mode="wb") as f:
-                    logging.info(f"Saving as {path}")
+                with open(filename, mode="wb") as f:
+                    logging.info(f"Saving as {filename}")
                     for chunk in r.iter_content(chunk_size=10 * 1204):
                         f.write(chunk)
             except requests.HTTPError as err:
-                return err
+                logging.warning(err)
         return None
         
     def __repr__(self):
         return f"Recording(start_time={self.start_time!r}, engagement_id={self.engagement_id!r}, recording_id={self.recording_id!r}, channel_type={self.channel_type!r}, download_url={self.download_url!r})"
 
 def get_recording_list(client: Client) -> list[Recording]:
+    logging.info("Getting list of recordings...")
     recording_list = []
     endpoint = f"{client.base_url}/contact_center/recordings"
     headers = {
@@ -121,6 +130,7 @@ def get_recording_list(client: Client) -> list[Recording]:
         try:
             while True:
                 if client.token_has_expired:
+                    logging.debug("Bearer token has expired, generating a new one...")
                     client.get_token()
                     headers["Authorization"] = f"Bearer {client.token}"
                 r = requests.get(endpoint, headers=headers)
@@ -141,24 +151,21 @@ def get_recording_list(client: Client) -> list[Recording]:
                 if not params["next_page_token"]:
                     break
         except requests.HTTPError as err:
-            print(err)
-
+            logging.info("Unable to retrieve the list of recordings")
+            logging.debug(err)
+            exit(1)
+    logging.info(f"Returning {len(recording_list)} records")
     return recording_list
 
-def main():
-    errors = []
+def main() -> None:
     client = Client(ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, ZOOM_ACCOUNT_ID)
     client.get_token()
+    logging.info(f"Recording path is {RECORDING_PATH}")
     recording_list = get_recording_list(client)
-
-    for recording in tqdm(recording_list, desc="Downloading Recordings", unit="recording", position=0, leave=True):
-        result = recording.download(client)
-        if result:
-            errors.append(result)
-    if errors:
-        print("Errors:")
-        for error in errors:
-            print(error)
+    if recording_list:
+        for recording in recording_list:
+            recording.download(client, RECORDING_PATH)
+        logging.info("Finished!")
 
 if __name__ == "__main__":
     main()
