@@ -12,8 +12,8 @@ To run this script you must install the modules shown in the **requirements.txt*
 
 Next, open the `main.py` file and modify the following variables:
 
-**START_DATE**: The start date/time of the date range that you'd like to query
-**END_DATE**: The end date/time of the date range that you'd like to query
+**START_DATE**: The start date/time of the date range that you'd like to query  
+**END_DATE**: The end date/time of the date range that you'd like to query  
 **RECORDING_PATH**: The path to the location where you would like to store the downloaded recordings
 
 You must login to <https://marketplace.zoom.us> and create a new Server-to-Server OAuth app with the `contact_center_recording:read:admin` scope enabled. Once this is created you must populate the **ACCOUNT_ID**, **CLIENT_ID** and **CLIENT_SECRET** environment variables using the values from your Server-to-Server app. Rename the `.env_sample` file to `.env` and populate these values here. Note, the use of quotation marks is NOT required in the .env file.
