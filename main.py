@@ -1,8 +1,12 @@
-from datetime import datetime
+"""
+Connect to the Zoom Contact Center API, download recorded conversations and
+store them locally. Recordings are downloaded within a specified date/time range.
+"""
+
 import logging
 import os
 from pathlib import Path
-from sys import exit
+import sys
 
 from dotenv import load_dotenv
 import requests
@@ -13,9 +17,9 @@ logging.basicConfig(format="%(levelname)s:%(asctime)s %(message)s", datefmt="%d/
 
 # Load the environment variables from .env file. These should be populated with information from the Zoom S2S marketplace app.
 load_dotenv()
-ZOOM_ACCOUNT_ID = os.environ.get("ZOOM_ACCOUNT_ID")
-ZOOM_CLIENT_ID = os.environ.get("ZOOM_CLIENT_ID")
-ZOOM_CLIENT_SECRET = os.environ.get("ZOOM_CLIENT_SECRET")
+ZOOM_ACCOUNT_ID = str(os.environ.get("ZOOM_ACCOUNT_ID"))
+ZOOM_CLIENT_ID = str(os.environ.get("ZOOM_CLIENT_ID"))
+ZOOM_CLIENT_SECRET = str(os.environ.get("ZOOM_CLIENT_SECRET"))
 
 # Set the path where you would like to store the recordings
 RECORDING_PATH = Path.home() / "Desktop" / "Recordings"
@@ -24,7 +28,7 @@ RECORDING_PATH = Path.home() / "Desktop" / "Recordings"
 START_DATE = "2023-10-01T00:00:00"
 END_DATE = "2023-10-31T23:59:59"
 
-    
+
 class Recording:
     """Object to represent a recorded asset
 
@@ -58,13 +62,14 @@ class Recording:
             channel_type: str,
             recording_id: str,
             download_url: str
-            ) -> None:
+    ) -> None:
         self.start_time = start_time
         self.engagement_id = engagement_id
         self.channel_type = channel_type
         self.recording_id = recording_id
         self.download_url = download_url
-        self.filename = f"{start_time}_{self.engagement_id}_{self.recording_id}.{"mp3" if self.channel_type == "voice" else "mp4"}"
+        self.filename = f"{start_time}_{self.engagement_id}_{self.recording_id}.{
+            "mp3" if self.channel_type == "voice" else "mp4"}"
 
     def download(self, client: Client, path: Path) -> bool:
         """Method to download the recorded asset represented by the object. This method will accept a client connection
@@ -74,40 +79,43 @@ class Recording:
         Args:
             client (zoom.Client): The Zoom client connection object that contains the bearer token and base URL.
             path (pathlib.Path): A path object, where the recording should be stored locally. 
-        
+
         Returns:
             True if successful. Any failed attempt to download will exit with sys.exit(1)
         """
         headers = {
             "Authorization": f"Bearer {client.token}"
         }
-        start_time = datetime.fromisoformat(self.start_time).strftime("%y%d%m_%H%M%S")
+        # start_time = datetime.fromisoformat(self.start_time).strftime("%y%d%m_%H%M%S")
         try:
             if not path.exists():
                 path.mkdir(parents=True)
         except PermissionError as err:
-            logging.info(f"{err}, please check your RECORDING_PATH and try again")
+            logging.info(
+                "%s, please check your RECORDING_PATH and try again", err)
             exit(1)
         filename = Path(path, self.filename)
         with requests.Session() as req:
             if client.token_has_expired:
-                    logging.debug("Bearer token has expired, generating a new one...")
-                    client.get_token()
-                    headers["Authorization"] = f"Bearer {client.token}"
+                logging.debug(
+                    "Bearer token has expired, generating a new one...")
+                client.get_token()
+                headers["Authorization"] = f"Bearer {client.token}"
             try:
                 r = req.get(self.download_url, headers=headers, stream=True)
-                logging.debug(f"Downloading {self.download_url}")
+                logging.debug("Downloading %s", self.download_url)
                 r.raise_for_status()
                 with open(filename, mode="wb") as f:
-                    logging.info(f"Saving as {filename}")
+                    logging.info("Saving as %s", filename)
                     for chunk in r.iter_content(chunk_size=10 * 1204):
                         f.write(chunk)
             except requests.HTTPError as err:
                 logging.warning(err)
         return True
-        
+
     def __repr__(self):
         return f"Recording(start_time={self.start_time!r}, engagement_id={self.engagement_id!r}, recording_id={self.recording_id!r}, channel_type={self.channel_type!r}, download_url={self.download_url!r})"
+
 
 def get_recording_list(client: Client, start_range: str, end_range: str) -> list[Recording]:
     """Method to query the Zoom API to obtain a list of recordings based on the start and end date range provided.
@@ -137,10 +145,11 @@ def get_recording_list(client: Client, start_range: str, end_range: str) -> list
         try:
             while True:
                 if client.token_has_expired:
-                    logging.debug("Bearer token has expired, generating a new one...")
+                    logging.debug(
+                        "Bearer token has expired, generating a new one...")
                     client.get_token()
                     headers["Authorization"] = f"Bearer {client.token}"
-                r = requests.get(endpoint, headers=headers)
+                r = req.get(endpoint, headers=headers, timeout=3000)
                 r.raise_for_status()
                 response_body = r.json()
                 if response_body["recordings"]:
@@ -154,25 +163,28 @@ def get_recording_list(client: Client, start_range: str, end_range: str) -> list
                                 recording["download_url"]
                             )
                         )
-                params["next_page_token"] == r.json()["next_page_token"]
+                params["next_page_token"] = r.json()["next_page_token"]
                 if not params["next_page_token"]:
                     break
         except requests.HTTPError as err:
             logging.info("Unable to retrieve the list of recordings")
             logging.debug(err)
-            exit(1)
-    logging.info(f"Returning {len(recording_list)} records")
+            sys.exit(1)
+    logging.info("Returning %s records", len(recording_list))
     return recording_list
 
+
 def main() -> None:
+    """Main loop."""
     client = Client(ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, ZOOM_ACCOUNT_ID)
     client.get_token()
-    logging.info(f"Recording path is {RECORDING_PATH}")
+    logging.info("Recording path is %s", RECORDING_PATH)
     recording_list = get_recording_list(client, START_DATE, END_DATE)
     if recording_list:
         for recording in recording_list:
             recording.download(client, RECORDING_PATH)
         logging.info("Finished!")
+
 
 if __name__ == "__main__":
     main()
