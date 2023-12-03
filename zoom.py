@@ -71,11 +71,10 @@ class Client:
 
     @property
     def token_has_expired(self) -> bool:
-        """Check if the current token is still valid.
+        """Check if the current bearer token is still valid.
 
         Returns:
-            True: If the token is still valid
-            False: If the token has expired
+            bool: True if the token has expired, otherwise False.
         """
         now = datetime.now().timestamp()
         return now > self.expiry_time
