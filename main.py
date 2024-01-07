@@ -25,10 +25,6 @@ ZOOM_CLIENT_SECRET = str(os.environ.get("ZOOM_CLIENT_SECRET"))
 # Set the path where you would like to store the recordings
 RECORDING_PATH = Path.home() / "Desktop" / "Recordings"
 
-# Set the timeframe for the download. Use ISO 8601 formatted strings.
-START_DATE = "2023-10-01T00:00:00"
-END_DATE = "2023-10-31T23:59:59"
-
 
 class Recording:
     """Object to represent a recorded asset
