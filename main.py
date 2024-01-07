@@ -10,6 +10,7 @@ import sys
 
 from dotenv import load_dotenv
 import requests
+import timeframes
 from zoom import Client
 
 # Configure logging
@@ -117,7 +118,7 @@ class Recording:
         return f"Recording(start_time={self.start_time!r}, engagement_id={self.engagement_id!r}, recording_id={self.recording_id!r}, channel_type={self.channel_type!r}, download_url={self.download_url!r})"
 
 
-def get_recording_list(client: Client, start_range: str, end_range: str) -> list[Recording]:
+def get_recording_list(client: Client, date_range: callable) -> list[Recording]:
     """Method to query the Zoom API to obtain a list of recordings based on the start and end date range provided.
 
     Args:
@@ -135,8 +136,7 @@ def get_recording_list(client: Client, start_range: str, end_range: str) -> list
         "Authorization": f"Bearer {client.token}",
     }
     params = {
-        "from": start_range,
-        "to": end_range,
+        **date_range(),
         "channel_type": "voice",
         "next_page_token": ""
     }
@@ -179,7 +179,7 @@ def main() -> None:
     client = Client(ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET, ZOOM_ACCOUNT_ID)
     client.get_token()
     logging.info("Recording path is %s", RECORDING_PATH)
-    recording_list = get_recording_list(client, START_DATE, END_DATE)
+    recording_list = get_recording_list(client, timeframes.last_week)
     if recording_list:
         for recording in recording_list:
             recording.download(client, RECORDING_PATH)
